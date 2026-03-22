@@ -137,7 +137,7 @@ export async function getBasket(
         items,
         total_eur: basket.totalEur,
         items_count: items.length,
-        share_url: `https://app.la-carotte.fr/shared-basket/${basket.shareToken}`,
+        share_url: `https://shop.la-carotte.fr/shared-basket/${basket.shareToken}`,
         expires_at: basket.expiresAt.toISOString(),
         is_owner: isOwner,
       },

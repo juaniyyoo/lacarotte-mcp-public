@@ -85,7 +85,7 @@ export async function getCheckoutInfo(
             items,
             subtotal_eur: subtotal,
             delivery_options: [],
-            app_checkout_url: `https://app.la-carotte.fr/cart/payment?commandId=${input.basket_id}`,
+            app_checkout_url: `https://shop.la-carotte.fr/cart/payment?commandId=${input.basket_id}`,
           },
           message: `Votre panier contient ${items.length} article${items.length > 1 ? "s" : ""} pour un total de ${subtotal.toFixed(2)} €. Finalisez votre commande sur l'application LaCarotte.`,
           meta: {
@@ -184,7 +184,7 @@ export async function getCheckoutInfo(
         items,
         subtotal_eur: Math.round(subtotal * 100) / 100,
         delivery_options: deliveryOptions,
-        app_checkout_url: `https://app.la-carotte.fr/cart/payment?basketId=${input.basket_id}`,
+        app_checkout_url: `https://shop.la-carotte.fr/cart/payment?basketId=${input.basket_id}`,
       },
       message: `Votre panier contient ${items.length} article${items.length > 1 ? "s" : ""} pour un total de ${subtotal.toFixed(2)} €. Pour finaliser votre commande, rendez-vous sur l'application LaCarotte.`,
       meta: {

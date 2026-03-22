@@ -80,7 +80,7 @@ export async function createBasket(
       updatedAt: now,
     });
 
-    const shareUrl = `https://app.la-carotte.fr/shared-basket/${shareToken}`;
+    const shareUrl = `https://shop.la-carotte.fr/shared-basket/${shareToken}`;
 
     await logAnalyticsEvent(
       TOOL_NAME,
