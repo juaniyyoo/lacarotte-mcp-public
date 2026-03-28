@@ -1,6 +1,6 @@
 {
   "name": "lacarotte-mcp",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "description": "Serveur MCP LaCarotte — Expose le catalogue de produits locaux en circuits courts aux agents IA",
   "type": "module",
   "main": "dist/server.js",
