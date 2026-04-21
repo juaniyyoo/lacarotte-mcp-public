@@ -7,7 +7,9 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import express from "express";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import config from "./config/index.js";
 import { connectDb, disconnectDb } from "./db/client.js";
@@ -26,13 +28,21 @@ import { getBasket } from "./tools/cart/get-basket.js";
 import { removeFromBasket } from "./tools/cart/remove-from-basket.js";
 
 // ═══════════════════════════════════════════
-// MCP Server Setup
+// MCP Server Factory — one instance per session
 // ═══════════════════════════════════════════
 
-const server = new McpServer({
-  name: "LaCarotte — Produits Locaux Circuits Courts",
-  version: "1.0.0",
-});
+function createMcpServer(): McpServer {
+  const server = new McpServer({
+    name: "LaCarotte — Produits Locaux Circuits Courts",
+    version: "1.0.0",
+    instructions: `Tu as accès au catalogue LaCarotte, une plateforme de vente en circuits courts.
+Utilise search_products pour trouver des produits locaux (fruits, légumes, fromages, viandes, épicerie…).
+Utilise check_stock pour vérifier la disponibilité avant d'ajouter au panier.
+Utilise check_delivery_zone pour savoir si une adresse est livrée.
+Utilise create_basket puis add_to_basket pour construire une commande.
+Utilise get_checkout_info pour finaliser.
+La ressource store-context donne le contexte général du magasin (producteurs, labels, zones).`,
+  });
 
 // ─── Resources ───
 
@@ -221,12 +231,36 @@ Bloqué en pré-lancement.`,
   },
 );
 
+  return server;
+}
+
 // ═══════════════════════════════════════════
 // Express SSE Transport
 // ═══════════════════════════════════════════
 
 const app = express();
+app.use(express.json());
+
+// ─── CORS pour Claude.ai et autres clients MCP ───
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = ["https://claude.ai", "https://api.anthropic.com"];
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization, Mcp-Session-Id");
+    res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
+  }
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+  next();
+});
+
 const transports: Map<string, SSEServerTransport> = new Map();
+// Transport Streamable HTTP stateful (sessions)
+const streamableTransports: Map<string, StreamableHTTPServerTransport> = new Map();
 
 // ─── Quota : connexions SSE concurrentes ───
 let activeConnections = 0;
@@ -254,6 +288,58 @@ app.get("/health", (_req, res) => {
   });
 });
 
+// ─── Streamable HTTP transport (Claude.ai, clients modernes) ───
+
+app.post("/mcp", async (req, res) => {
+  const sessionId = req.headers["mcp-session-id"] as string | undefined;
+
+  let transport: StreamableHTTPServerTransport;
+
+  if (sessionId && streamableTransports.has(sessionId)) {
+    transport = streamableTransports.get(sessionId)!;
+  } else if (!sessionId) {
+    // Nouvelle session
+    transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+      onsessioninitialized: (sid) => {
+        streamableTransports.set(sid, transport);
+      },
+    });
+    transport.onclose = () => {
+      const sid = transport.sessionId;
+      if (sid) streamableTransports.delete(sid);
+    };
+    const mcpServer = createMcpServer();
+    await mcpServer.connect(transport);
+  } else {
+    res.status(404).json({ error: "Session inconnue" });
+    return;
+  }
+
+  await transport.handleRequest(req, res, req.body);
+});
+
+app.get("/mcp", async (req, res) => {
+  const sessionId = req.headers["mcp-session-id"] as string | undefined;
+  if (!sessionId || !streamableTransports.has(sessionId)) {
+    res.status(400).json({ error: "Session ID requis" });
+    return;
+  }
+  const transport = streamableTransports.get(sessionId)!;
+  await transport.handleRequest(req, res);
+});
+
+app.delete("/mcp", async (req, res) => {
+  const sessionId = req.headers["mcp-session-id"] as string | undefined;
+  if (!sessionId || !streamableTransports.has(sessionId)) {
+    res.status(404).json({ error: "Session inconnue" });
+    return;
+  }
+  const transport = streamableTransports.get(sessionId)!;
+  await transport.handleRequest(req, res);
+  streamableTransports.delete(sessionId);
+});
+
 app.get("/sse", async (req, res) => {
   if (activeConnections >= MAX_CONCURRENT_CONNECTIONS) {
     res.status(503).json({
@@ -273,7 +359,8 @@ app.get("/sse", async (req, res) => {
     activeConnections--;
   });
 
-  await server.connect(transport);
+  const mcpServer = createMcpServer();
+  await mcpServer.connect(transport);
 });
 
 app.post("/messages", async (req, res) => {
