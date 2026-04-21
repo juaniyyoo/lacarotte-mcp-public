@@ -11,18 +11,28 @@ function requireEnv(key: string, fallback?: string): string {
 }
 
 export const config = {
-  // API LaCarotte
+  // API LaCarotte — supporte LACAROTTE_API_URL ou LA_CAROTTE_API_URL
   lacarotte: {
-    apiUrl: requireEnv("LACAROTTE_API_URL", "http://localhost:3200"),
+    apiUrl: process.env.LACAROTTE_API_URL ?? process.env.LA_CAROTTE_API_URL ?? "http://localhost:3200",
     privateKey: requireEnv("LACAROTTE_PRIVATE_KEY", ""),
     defaultTenant: requireEnv("LACAROTTE_DEFAULT_TENANT", ".fr.la-carotte"),
     serverClientId: requireEnv("LACAROTTE_SERVER_CLIENT_ID", "lacarotte-mcp"),
   },
 
-  // MongoDB
+  // MongoDB — supporte MONGODB_URI direct ou variables LA_CAROTTE_DATABASE_*
   mongodb: {
-    uri: requireEnv("MONGODB_URI", "mongodb://localhost:27017"),
-    dbName: requireEnv("MONGODB_DB_NAME", "lacarotte"),
+    uri: process.env.MONGODB_URI ?? (() => {
+      const host = process.env.LA_CAROTTE_DATABASE_ADDRESS ?? "localhost";
+      const port = process.env.LA_CAROTTE_DATABASE_PORT ?? "27017";
+      const user = process.env.LA_CAROTTE_DATABASE_USER;
+      const pass = process.env.LA_CAROTTE_DATABASE_PASSWORD;
+      const db   = process.env.LA_CAROTTE_DATABASE_NAME ?? "lacarotte";
+      if (user && pass) {
+        return `mongodb://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}/${db}`;
+      }
+      return `mongodb://${host}:${port}/${db}`;
+    })(),
+    dbName: process.env.MONGODB_DB_NAME ?? process.env.LA_CAROTTE_DATABASE_NAME ?? "lacarotte",
   },
 
   // Redis (Upstash)
@@ -75,9 +85,9 @@ export const config = {
 
   // Rate limiting defaults
   rateLimiting: {
-    searchPerMinute: 30,
-    transactionalPerMinute: 10,
-    globalPerMinute: 60,
+    searchPerMinute: 10,
+    transactionalPerMinute: 5,
+    globalPerMinute: 20,
   },
 } as const;
 

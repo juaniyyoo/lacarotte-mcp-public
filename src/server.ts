@@ -228,6 +228,23 @@ Bloqué en pré-lancement.`,
 const app = express();
 const transports: Map<string, SSEServerTransport> = new Map();
 
+// ─── Quota : connexions SSE concurrentes ───
+let activeConnections = 0;
+const MAX_CONCURRENT_CONNECTIONS = parseInt(process.env.MCP_MAX_CONNECTIONS ?? "15", 10);
+
+// ─── Quota : rate limiting par IP sur /messages ───
+const ipStore = new Map<string, { count: number; resetAt: number }>();
+const IP_MAX_REQUESTS = parseInt(process.env.MCP_IP_MAX_REQUESTS ?? "20", 10);
+const IP_WINDOW_MS = 60_000;
+
+// Nettoyage périodique de l'IP store (toutes les 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of ipStore) {
+    if (now >= entry.resetAt) ipStore.delete(key);
+  }
+}, 5 * 60_000).unref();
+
 app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
@@ -238,17 +255,47 @@ app.get("/health", (_req, res) => {
 });
 
 app.get("/sse", async (req, res) => {
+  if (activeConnections >= MAX_CONCURRENT_CONNECTIONS) {
+    res.status(503).json({
+      error: "Serveur saturé — trop de connexions actives. Réessayez dans quelques instants.",
+      active_connections: activeConnections,
+      max_connections: MAX_CONCURRENT_CONNECTIONS,
+    });
+    return;
+  }
+
+  activeConnections++;
   const transport = new SSEServerTransport("/messages", res);
   transports.set(transport.sessionId, transport);
 
   res.on("close", () => {
     transports.delete(transport.sessionId);
+    activeConnections--;
   });
 
   await server.connect(transport);
 });
 
 app.post("/messages", async (req, res) => {
+  // Rate limiting par IP
+  const ip = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0].trim()
+    ?? req.socket.remoteAddress
+    ?? "unknown";
+  const now = Date.now();
+  const ipEntry = ipStore.get(ip);
+  if (!ipEntry || now >= ipEntry.resetAt) {
+    ipStore.set(ip, { count: 1, resetAt: now + IP_WINDOW_MS });
+  } else if (ipEntry.count >= IP_MAX_REQUESTS) {
+    const retryAfter = Math.ceil((ipEntry.resetAt - now) / 1000);
+    res.status(429).json({
+      error: "Trop de requêtes — quota par minute atteint.",
+      retry_after_seconds: retryAfter,
+    });
+    return;
+  } else {
+    ipEntry.count++;
+  }
+
   const sessionId = req.query.sessionId as string;
   const transport = transports.get(sessionId);
 
