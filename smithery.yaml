@@ -1,0 +1,17 @@
+# Smithery configuration — https://smithery.ai/docs/config#smitheryyaml
+
+startCommand:
+  type: http
+  url: "https://mcp.la-carotte.fr/mcp"
+  configSchema:
+    type: object
+    properties: {}
+    required: []
+
+# Human-readable metadata
+displayName: "LaCarotte — Produits Locaux & Circuits Courts"
+description: |
+  Accédez au catalogue de produits locaux LaCarotte directement depuis votre agent IA.
+  Recherchez des fruits, légumes, fromages et autres produits de la ferme, vérifiez les stocks,
+  gérez un panier et préparez votre commande en circuits courts.
+iconUrl: "https://www.la-carotte.fr/favicon.ico"
