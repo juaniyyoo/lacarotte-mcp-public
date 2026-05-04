@@ -94,22 +94,8 @@ export async function checkStock(
     } else if (product.available === false) {
       availableQuantity = 0;
     } else {
-      // Try productionStocks endpoint
-      try {
-        const stocks = await client.getProductionStocks(
-          { productId: input.product_id },
-          tenantId,
-        );
-        if (stocks && stocks.length > 0) {
-          availableQuantity = stocks.reduce(
-            (sum, s) => sum + (s.quantity ?? 0),
-            0,
-          );
-        }
-      } catch {
-        // If productionStocks not available, assume available
-        availableQuantity = -1; // unknown
-      }
+      // Stock is not tracked for this product — treat as available (unknown quantity)
+      availableQuantity = -1; // unknown
     }
 
     if (availableQuantity === 0) {
