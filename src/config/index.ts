@@ -22,15 +22,21 @@ export const config = {
   // MongoDB — supporte MONGODB_URI direct ou variables LA_CAROTTE_DATABASE_*
   mongodb: {
     uri: process.env.MONGODB_URI ?? (() => {
-      const host = process.env.LA_CAROTTE_DATABASE_ADDRESS ?? "localhost";
-      const port = process.env.LA_CAROTTE_DATABASE_PORT ?? "27017";
-      const user = process.env.LA_CAROTTE_DATABASE_USER;
-      const pass = process.env.LA_CAROTTE_DATABASE_PASSWORD;
-      const db   = process.env.LA_CAROTTE_DATABASE_NAME ?? "lacarotte";
+      const address    = process.env.LA_CAROTTE_DATABASE_ADDRESS ?? "localhost";
+      const port       = process.env.LA_CAROTTE_DATABASE_PORT ?? "27017";
+      const user       = process.env.LA_CAROTTE_DATABASE_USER;
+      const pass       = process.env.LA_CAROTTE_DATABASE_PASSWORD;
+      const db         = process.env.LA_CAROTTE_DATABASE_NAME ?? "lacarotte";
+      const replicaSet = process.env.LA_CAROTTE_DATABASE_REPLICA_SET;
+      // Build host list: each host gets its own port
+      const hosts = address.includes(',')
+        ? address.split(',').map(h => `${h.trim()}:${port}`).join(',')
+        : `${address}:${port}`;
+      const rsParam = replicaSet ? `&replicaSet=${replicaSet}` : '';
       if (user && pass) {
-        return `mongodb://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}/${db}`;
+        return `mongodb://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${hosts}/${db}?authSource=admin${rsParam}`;
       }
-      return `mongodb://${host}:${port}/${db}`;
+      return `mongodb://${hosts}/${db}`;
     })(),
     dbName: process.env.MONGODB_DB_NAME ?? process.env.LA_CAROTTE_DATABASE_NAME ?? "lacarotte",
   },
