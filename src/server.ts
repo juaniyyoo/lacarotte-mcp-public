@@ -32,17 +32,21 @@ import { removeFromBasket } from "./tools/cart/remove-from-basket.js";
 // ═══════════════════════════════════════════
 
 function createMcpServer(): McpServer {
-  const server = new McpServer({
-    name: "LaCarotte — Produits Locaux Circuits Courts",
-    version: "1.0.0",
-    instructions: `Tu as accès au catalogue LaCarotte, une plateforme de vente en circuits courts.
+  const server = new McpServer(
+    {
+      name: "LaCarotte — Produits Locaux Circuits Courts",
+      version: "1.0.0",
+    },
+    {
+      instructions: `Tu as accès au catalogue LaCarotte, une plateforme de vente en circuits courts.
 Utilise search_products pour trouver des produits locaux (fruits, légumes, fromages, viandes, épicerie…).
 Utilise check_stock pour vérifier la disponibilité avant d'ajouter au panier.
 Utilise check_delivery_zone pour savoir si une adresse est livrée.
 Utilise create_basket puis add_to_basket pour construire une commande.
 Utilise get_checkout_info pour finaliser.
 La ressource store-context donne le contexte général du magasin (producteurs, labels, zones).`,
-  });
+    },
+  );
 
 // ─── Resources ───
 
@@ -239,7 +243,13 @@ Bloqué en pré-lancement.`,
 // ═══════════════════════════════════════════
 
 const app = express();
-app.use(express.json());
+// Apply express.json() only on routes that need pre-parsed body (/mcp Streamable HTTP).
+// The SSE /messages route uses handlePostMessage() which reads the raw request stream
+// directly — pre-parsing the body would consume the stream and cause "stream is not readable".
+app.use((req, res, next) => {
+  if (req.path === "/messages") return next();
+  express.json()(req, res, next);
+});
 
 // ─── CORS pour Claude.ai et autres clients MCP ───
 app.use((req, res, next) => {
