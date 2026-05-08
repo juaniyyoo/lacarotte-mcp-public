@@ -194,8 +194,7 @@ server.tool(
   `Création d'un panier persistant avec lien partageable.
 QUAND L'UTILISER : le client veut commencer ses courses ou créer un panier.
 CE QUE C'EST : création d'un panier vide avec tokens de partage.
-CE QUE CE N'EST PAS : un ajout de produit (utiliser add_to_basket ensuite).
-Bloqué en pré-lancement.`,
+CE QUE CE N'EST PAS : un ajout de produit (utiliser add_to_basket ensuite).`,
   {
     label: z.string().max(100).optional().describe("Nom du panier"),
     tenant_id: z.string().optional().describe("Identifiant du territoire"),
@@ -213,8 +212,7 @@ server.tool(
   `Ajout d'un produit à un panier LaCarotte existant.
 QUAND L'UTILISER : le client veut ajouter un produit à son panier.
 CE QUE C'EST : ajout avec vérification de stock et snapshot du prix.
-CE QUE CE N'EST PAS : une commande ni un paiement.
-Bloqué en pré-lancement.`,
+CE QUE CE N'EST PAS : une commande ni un paiement.`,
   {
     basket_id: z.string().describe("Identifiant du panier"),
     product_id: z.string().describe("Identifiant du produit"),
@@ -256,8 +254,7 @@ server.tool(
   `Retrait d'un produit d'un panier LaCarotte.
 QUAND L'UTILISER : le client veut retirer un produit de son panier.
 CE QUE C'EST : suppression d'un article du panier.
-CE QUE CE N'EST PAS : une annulation de commande.
-Bloqué en pré-lancement.`,
+CE QUE CE N'EST PAS : une annulation de commande.`,
   {
     basket_id: z.string().describe("Identifiant du panier"),
     product_id: z.string().describe("Identifiant du produit"),
