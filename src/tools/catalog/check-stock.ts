@@ -9,6 +9,7 @@
  */
 
 import { getLaCarotteClient, LaCarotteApiError } from "../../services/lacarotte-client.js";
+import { getCategoryMaps } from "../../services/category-cache.js";
 import { CheckStockInputSchema } from "../../schemas/catalog.js";
 import { checkPreLaunch, getLaunchInfo } from "../../middleware/pre-launch.js";
 import { checkRateLimit } from "../../middleware/rate-limiter.js";
@@ -57,18 +58,24 @@ export async function checkStock(
     // Fetch product info (API getProduct by ID may return null due to id/_id mismatch,
     // so fall back to fetching all products and finding by ID)
     let product;
+    // Priorité à getProducts (liste) qui retourne le champ `stock` enrichi
+    // getProduct (single) ne retourne pas stock
     try {
-      product = await client.getProduct(input.product_id, tenantId);
+      const allProducts = await client.getProducts(undefined, tenantId);
+      product = allProducts.find(
+        (p) => p._id === input.product_id || p.id === input.product_id,
+      ) ?? null;
     } catch {
       product = null;
     }
 
     if (!product) {
-      // Fallback: fetch all products and find by ID
-      const allProducts = await client.getProducts(undefined, tenantId);
-      product = allProducts.find(
-        (p) => p._id === input.product_id || p.id === input.product_id,
-      );
+      // Fallback sur l'endpoint single si la liste échoue
+      try {
+        product = await client.getProduct(input.product_id, tenantId);
+      } catch {
+        product = null;
+      }
     }
 
     if (!product) {
@@ -115,28 +122,35 @@ export async function checkStock(
       status = "out_of_stock";
     }
 
-    // If out of stock, find alternatives
+    // If out of stock, find alternatives in the same category
     let alternatives: CheckStockOutput["alternatives"] = undefined;
     if (status === "out_of_stock") {
       try {
-        const category = product.category || product.categoryId;
-        if (category) {
-          const allProducts = await client.getProducts(undefined, tenantId);
-          const catLower = category.toLowerCase();
-          alternatives = allProducts
-            .filter((p) =>
-              p._id !== input.product_id &&
-              p.available !== false &&
-              ((p.category || p.categoryId || "").toLowerCase() === catLower)
-            )
-            .slice(0, 3)
-            .map((p) => ({
-              id: p._id || p.id || "",
-              name: p.name,
-              price_eur: p.referenceUnitGrossPrice ?? 0,
-              producer_name: "Producteur local",
-            }));
-        }
+        const typeId = product.productType?.id;
+        const categoryMaps = await getCategoryMaps(tenantId).catch(() => new Map());
+        const catInfo = typeId ? categoryMaps.get(typeId) : undefined;
+        // Match on productTypeId (exact) or category name fallback
+        const allProducts = await client.getProducts(undefined, tenantId);
+        alternatives = allProducts
+          .filter((p) => {
+            if (p._id === input.product_id || p.id === input.product_id) return false;
+            if (p.available === false) return false;
+            const pTypeId = p.productType?.id;
+            if (typeId && pTypeId && pTypeId === typeId) return true;
+            // Fallback legacy
+            if (catInfo && catInfo.categoryNames.length > 0) {
+              const legacyCat = (p.category || p.categoryId || "").toLowerCase();
+              return catInfo.categoryNames.some((n: string) => n.toLowerCase() === legacyCat);
+            }
+            return false;
+          })
+          .slice(0, 3)
+          .map((p) => ({
+            id: p._id || p.id || "",
+            name: p.name,
+            price_eur: p.referenceUnitGrossPrice ?? 0,
+            producer_name: "Producteur local",
+          }));
       } catch {
         // Alternatives are best-effort
       }

@@ -9,6 +9,8 @@
  */
 
 import { getLaCarotteClient, LaCarotteApiError } from "../../services/lacarotte-client.js";
+import { getContractMaps } from "../../services/contract-cache.js";
+import { getCategoryMaps } from "../../services/category-cache.js";
 import { SearchProductsInputSchema } from "../../schemas/catalog.js";
 import { checkPreLaunch, getLaunchInfo } from "../../middleware/pre-launch.js";
 import { checkRateLimit } from "../../middleware/rate-limiter.js";
@@ -159,10 +161,22 @@ export async function searchProducts(
 
     if (input.category) {
       const cat = input.category.toLowerCase();
-      filtered = filtered.filter((p) =>
-        (p.categoryId || "").toLowerCase().includes(cat) ||
-        (p.category || "").toLowerCase().includes(cat)
-      );
+      // Charge les maps de catégories pour filtrer sur les vrais noms
+      const categoryMaps = await getCategoryMaps(tenantId).catch(() => new Map());
+      filtered = filtered.filter((p) => {
+        const typeId = p.productType?.id;
+        if (typeId) {
+          const info = categoryMaps.get(typeId);
+          if (info) {
+            return info.allNames.some((n: string) => n.toLowerCase().includes(cat));
+          }
+        }
+        // Fallback sur les champs legacy si présents
+        return (
+          (p.categoryId || "").toLowerCase().includes(cat) ||
+          (p.category || "").toLowerCase().includes(cat)
+        );
+      });
     }
 
     if (input.label) {
@@ -193,9 +207,17 @@ export async function searchProducts(
       // Unknown tenant — skip distance
     }
 
-    // Enrich ALL filtered products with partner info (dataset is small, ~16 products)
+    // Build product→partner map via contracts
+    // Lien réel : Product → Contract (conditions[].productId) → Partner (Contract.partnerId)
+    // Note: contracts use logical ids (e.g. 'prod-miel-500g'), not MongoDB ObjectIds
+    const [{ productToPartner }, categoryMaps] = await Promise.all([
+      getContractMaps(tenantId),
+      getCategoryMaps(tenantId).catch(() => new Map()),
+    ]);
+
+    // Enrich ALL filtered products with partner info
     const uniquePartnerIds = [...new Set(
-      filtered.map((p) => p.partnerId).filter(Boolean) as string[],
+      filtered.map((p) => productToPartner.get(p.id || p._id || "")).filter(Boolean) as string[],
     )];
     const partnerPromises = uniquePartnerIds.map((pid) =>
       getPartnerCached(pid, tenantId),
@@ -210,10 +232,11 @@ export async function searchProducts(
     if (input.producer) {
       const producerLower = input.producer.toLowerCase();
       filtered = filtered.filter((p) => {
-        if (!p.partnerId) return false;
-        const partner = partnerMap.get(p.partnerId);
+        const partnerId = productToPartner.get(p.id || p._id || "");
+        if (!partnerId) return false;
+        const partner = partnerMap.get(partnerId);
         if (!partner) return false;
-        const name = (partner.name || partner.companyName || "").toLowerCase();
+        const name = (partner.name || partner.companyName || partner.commercialName || "").toLowerCase();
         return name.includes(producerLower);
       });
     }
@@ -250,9 +273,8 @@ export async function searchProducts(
 
     // Map to output format
     const enriched: SearchProductResult[] = paginatedProducts.map((product) => {
-      const partner = product.partnerId
-        ? partnerMap.get(product.partnerId)
-        : null;
+      const partnerId = productToPartner.get(product.id || product._id || "");
+      const partner = partnerId ? partnerMap.get(partnerId) : null;
 
       let distanceKm: number | undefined;
       if (tenantCoords && partner?.coordinates) {
@@ -268,14 +290,22 @@ export async function searchProducts(
         .map((lid) => labelMap.get(lid) ?? lid)
         .filter(Boolean) as string[];
 
+      const typeId = product.productType?.id;
+      const catInfo = typeId ? categoryMaps.get(typeId) : undefined;
+      const categoryDisplay = catInfo
+        ? catInfo.categoryNames[0] ?? catInfo.typeName
+        : (product.category || product.categoryId || "Non catégorisé");
+      const typeDisplay = catInfo?.typeName ?? product.productType?.id ?? undefined;
+
       return {
-        id: product._id || product.id || "",
+        id: product.id || product._id || "",
         name: product.name,
         description: product.description,
-        category: product.category || product.categoryId || "Non catégorisé",
+        category: categoryDisplay,
+        product_type: typeDisplay ? { name: typeDisplay } : undefined,
         producer: {
-          id: partner?._id || partner?.id || product.partnerId || "",
-          name: partner?.name || partner?.companyName || "Producteur local",
+          id: partner?._id || partner?.id || partnerId || "",
+          name: partner?.name || partner?.companyName || (partner as any)?.commercialName || "Producteur local",
           locality: partner?.city || partner?.locality,
           distance_km: distanceKm,
           certifications: (partner?.certifications || partner?.labels || []) as string[],

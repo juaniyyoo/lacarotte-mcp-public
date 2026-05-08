@@ -51,6 +51,14 @@ export interface LaCarotteProduct {
   description?: string;
   categoryId?: string;
   category?: string;
+  productTypeId?: string;
+  /** Objet productType embarqué tel que retourné par l'API */
+  productType?: {
+    id: string;
+    name: string;
+    categories?: LaCarotteProductCategory[];
+    [key: string]: unknown;
+  };
   partnerId?: string;
   referenceUnitGrossPrice?: number;
   VAT?: number;
@@ -116,6 +124,22 @@ export interface LaCarotteProductionStock {
   [key: string]: unknown;
 }
 
+export interface LaCarotteContractCondition {
+  productId: string;
+  partnerProductId?: string;
+  [key: string]: unknown;
+}
+
+export interface LaCarotteContract {
+  _id: string;
+  id?: string;
+  tenantId: string;
+  partnerId: string;
+  conditions?: LaCarotteContractCondition[];
+  deleted?: boolean;
+  [key: string]: unknown;
+}
+
 export interface LaCarotteCommand {
   _id: string;
   id?: string;
@@ -159,6 +183,30 @@ export interface LaCarotteCategory {
   [key: string]: unknown;
 }
 
+export interface LaCarotteProductCategory {
+  _id: string;
+  id: string;
+  tenantId: string;
+  name: string;
+  parentId?: string;
+  deleted?: boolean;
+  [key: string]: unknown;
+}
+
+export interface LaCarotteProductType {
+  _id: string;
+  id: string;
+  tenantId: string;
+  name: string;
+  /** Liste d'ids de ProductCategory */
+  categoriesId?: string[];
+  /** Catégories directement imbriquées (renvoyées par l'API) */
+  categories?: LaCarotteProductCategory[];
+  currencyId?: string;
+  deleted?: boolean;
+  [key: string]: unknown;
+}
+
 // ═══════════════════════════════════════════
 // Types de sortie des tools MCP
 // ═══════════════════════════════════════════
@@ -168,6 +216,7 @@ export interface SearchProductResult {
   name: string;
   description?: string;
   category: string;
+  product_type?: { name: string };
   producer: {
     id: string;
     name: string;
@@ -213,6 +262,7 @@ export interface GetProductOutput {
   name: string;
   description?: string;
   category: string;
+  product_type?: { name: string };
   partner: {
     id: string;
     name: string;

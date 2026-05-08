@@ -11,10 +11,13 @@ import type {
   LaCarottePlace,
   LaCarotteLabel,
   LaCarotteProductionStock,
+  LaCarotteContract,
   LaCarotteCommand,
   LaCarotteCart,
   LaCarottePayment,
   LaCarotteCategory,
+  LaCarotteProductCategory,
+  LaCarotteProductType,
 } from "../types/index.js";
 
 export class LaCarotteApiError extends Error {
@@ -187,12 +190,48 @@ export class LaCarotteClient {
     });
   }
 
-  async getCategories(tenantId?: string): Promise<LaCarotteCategory[]> {
-    return this.request<LaCarotteCategory[]>("GET", "/api/productCategories", {
-      businessProcess: "REFERENCE_DATA_MANAGEMENT",
+  async getCategories(tenantId?: string): Promise<LaCarotteProductCategory[]> {
+    return this.request<LaCarotteProductCategory[]>("GET", "/api/productCategories", {
+      businessProcess: "COMMAND_PRODUCT_LISTING",
       action: "LIST",
       tenantId,
     });
+  }
+
+  async getProductTypes(tenantId?: string): Promise<LaCarotteProductType[]> {
+    return this.request<LaCarotteProductType[]>("GET", "/api/productTypes", {
+      businessProcess: "COMMAND_PRODUCT_LISTING",
+      action: "LIST",
+      tenantId,
+    });
+  }
+
+  async getContracts(
+    query?: Record<string, string>,
+    tenantId?: string,
+  ): Promise<LaCarotteContract[]> {
+    return this.request<LaCarotteContract[]>("GET", "/api/contracts", {
+      businessProcess: "CONTRACT_MANAGEMENT",
+      action: "LIST",
+      query,
+      tenantId,
+    });
+  }
+
+  async getPartnerProducts(
+    query?: Record<string, string>,
+    tenantId?: string,
+  ): Promise<Array<{ id: string; partnerId: string; name?: string }>> {
+    return this.request<Array<{ id: string; partnerId: string; name?: string }>>(
+      "GET",
+      "/api/partnerProducts",
+      {
+        businessProcess: "PARTNER_PRODUCT_MANAGEMENT",
+        action: "LIST",
+        query,
+        tenantId,
+      },
+    );
   }
 
   async getProductionStocks(
