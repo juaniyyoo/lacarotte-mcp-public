@@ -14,7 +14,15 @@ export const config = {
   // API LaCarotte — supporte LACAROTTE_API_URL ou LA_CAROTTE_API_URL
   lacarotte: {
     apiUrl: process.env.LACAROTTE_API_URL ?? process.env.LA_CAROTTE_API_URL ?? "http://localhost:3200",
-    privateKey: requireEnv("LACAROTTE_PRIVATE_KEY", ""),
+    privateKey: (() => {
+      const val = process.env.LACAROTTE_PRIVATE_KEY ?? "";
+      if (!val) return "";
+      // Support base64-encoded PEM (même format que LA_CAROTTE_PRIVATE_KEY dans l'API)
+      if (!val.startsWith("-----BEGIN")) {
+        try { return Buffer.from(val, "base64").toString("utf8"); } catch { return val; }
+      }
+      return val;
+    })(),
     defaultTenant: requireEnv("LACAROTTE_DEFAULT_TENANT", ".fr.la-carotte"),
     serverClientId: requireEnv("LACAROTTE_SERVER_CLIENT_ID", "lacarotte-mcp"),
   },

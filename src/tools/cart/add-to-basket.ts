@@ -101,6 +101,21 @@ export async function addToBasket(
       };
     }
 
+    // Verify ownership
+    if (basket.ownerToken !== input.owner_token) {
+      return {
+        status: "error",
+        data: null,
+        message: "Seul le propriétaire du panier peut ajouter des produits.",
+        meta: {
+          tenantId,
+          timestamp: new Date().toISOString(),
+          cache_hit: false,
+          request_id: requestId,
+        },
+      };
+    }
+
     // Fetch product info
     const product = await client.getProduct(input.product_id, tenantId);
 
