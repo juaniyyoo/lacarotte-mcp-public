@@ -70,6 +70,7 @@ export interface LaCarottePartner {
   tenantId: string;
   name?: string;
   companyName?: string;
+  commercialName?: string;
   description?: string;
   locality?: string;
   city?: string;
@@ -77,6 +78,10 @@ export interface LaCarottePartner {
   coordinates?: { lat: number; lng: number };
   certifications?: string[];
   labels?: string[];
+  /** Phrase du producteur : pourquoi il a choisi ce métier */
+  whyThisJob?: string;
+  /** Phrase du producteur : pourquoi il travaille avec La Carotte */
+  whyCarotte?: string;
   [key: string]: unknown;
 }
 
@@ -191,6 +196,8 @@ export interface SearchProductsOutput {
 export interface CheckStockOutput {
   product_id: string;
   product_name: string;
+  price_eur: number;
+  unit: string;
   available_quantity: number;
   status: "available" | "low_stock" | "out_of_stock";
   alternatives?: Array<{
@@ -199,6 +206,39 @@ export interface CheckStockOutput {
     price_eur: number;
     producer_name: string;
   }>;
+}
+
+export interface GetProductOutput {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  partner: {
+    id: string;
+    name: string;
+  } | null;
+  price_eur: number;
+  vat_pct: number;
+  unit: string;
+  stock_status: "available" | "low_stock" | "out_of_stock";
+  labels: string[];
+  allergens?: string[];
+  ingredients?: string[];
+  image_url?: string;
+}
+
+export interface ListPartnerResult {
+  id: string;
+  name: string;
+  contact_firstname?: string;
+  why_this_job?: string;
+  why_carotte?: string;
+  product_ids: string[];
+}
+
+export interface ListPartnersOutput {
+  partners: ListPartnerResult[];
+  total: number;
 }
 
 export interface DeliveryOption {

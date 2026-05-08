@@ -19,6 +19,8 @@ import { getStoreContext } from "./resources/store-context.js";
 import { searchProducts } from "./tools/catalog/search-products.js";
 import { checkStock } from "./tools/catalog/check-stock.js";
 import { checkDeliveryZone } from "./tools/catalog/check-delivery-zone.js";
+import { getProduct } from "./tools/catalog/get-product.js";
+import { listPartners } from "./tools/catalog/list-partners.js";
 import { getCheckoutInfo } from "./tools/checkout/get-checkout-info.js";
 
 // Phase 2 — Cart tools
@@ -126,6 +128,41 @@ CE QUE CE N'EST PAS : une planification de livraison, ni une commande.`,
   },
   async (args) => {
     const result = await checkDeliveryZone(args);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  },
+);
+
+server.tool(
+  "get_product",
+  `Fiche complète d'un produit LaCarotte par son ID.
+QUAND L'UTILISER : on connaît l'ID du produit et on veut tous ses détails (prix, unité, producteur, description).
+CE QUE C'EST : fiche produit complète.
+CE QUE CE N'EST PAS : une recherche — utiliser search_products pour chercher par mots-clés.`,
+  {
+    product_id: z.string().describe("Identifiant du produit"),
+    tenant_id: z.string().optional().describe("Identifiant du territoire"),
+  },
+  async (args) => {
+    const result = await getProduct(args);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  },
+);
+
+server.tool(
+  "list_partners",
+  `Liste des producteurs en ligne sur LaCarotte avec leurs produits disponibles et leurs phrases de présentation.
+QUAND L'UTILISER : l'utilisateur veut connaître les producteurs, leurs engagements, leurs produits.
+CE QUE C'EST : liste des partenaires actifs avec ID produits, phrases whyThisJob et whyCarotte.
+CE QUE CE N'EST PAS : une fiche produit — utiliser get_product pour les détails d'un produit.`,
+  {
+    tenant_id: z.string().optional().describe("Identifiant du territoire"),
+  },
+  async (args) => {
+    const result = await listPartners(args);
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };
@@ -251,16 +288,12 @@ app.use((req, res, next) => {
   express.json()(req, res, next);
 });
 
-// ─── CORS pour Claude.ai et autres clients MCP ───
+// ─── CORS — serveur public, tous clients MCP autorisés ───
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  const allowedOrigins = ["https://claude.ai", "https://api.anthropic.com"];
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization, Mcp-Session-Id");
-    res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
-  }
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization, Mcp-Session-Id");
+  res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
   if (req.method === "OPTIONS") {
     res.status(204).end();
     return;

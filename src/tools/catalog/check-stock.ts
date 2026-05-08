@@ -173,6 +173,8 @@ export async function checkStock(
       data: {
         product_id: input.product_id,
         product_name: productName,
+        price_eur: product.referenceUnitGrossPrice ?? 0,
+        unit: product.referenceUnit ?? "unité",
         available_quantity: Math.max(0, availableQuantity),
         status,
         alternatives,

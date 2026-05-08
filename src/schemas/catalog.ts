@@ -57,3 +57,16 @@ export const GetCheckoutInfoInputSchema = z.object({
 });
 
 export type GetCheckoutInfoInput = z.infer<typeof GetCheckoutInfoInputSchema>;
+
+export const GetProductInputSchema = z.object({
+  product_id: z.string().describe("Identifiant du produit LaCarotte"),
+  tenant_id: z.string().optional(),
+});
+
+export type GetProductInput = z.infer<typeof GetProductInputSchema>;
+
+export const ListPartnersInputSchema = z.object({
+  tenant_id: z.string().optional(),
+});
+
+export type ListPartnersInput = z.infer<typeof ListPartnersInputSchema>;
